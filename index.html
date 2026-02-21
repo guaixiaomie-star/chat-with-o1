@@ -286,6 +286,45 @@
             from { transform: scale(0.8); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
         }
+
+        /* ================= 📱 手机端适配专属魔法 ================= */
+        @media screen and (max-width: 768px) {
+            body {
+                flex-direction: column; /* 从左右排版变成上下排版 */
+            }
+            .sidebar {
+                width: 100%;       /* 侧边栏横向占满屏幕 */
+                height: 35vh;      /* 侧边栏占据屏幕上半部分 (约35%高度) */
+                border-right: none;
+                border-bottom: 2px solid var(--border-color);
+            }
+            .main-chat {
+                width: 100%;
+                height: 65vh;      /* 聊天区域占据屏幕下半部分 */
+            }
+            .messages-container {
+                padding: 15px 15px; /* 缩小手机端聊天两边的空白 */
+            }
+            .bubble {
+                max-width: 92%;    /* 让聊天气泡在手机上更宽一些，不再挤成一团 */
+            }
+            
+            /* 顺便修复一下统计看板和画廊在手机上的显示，防止被挤坏 */
+            .charts-grid {
+                grid-template-columns: 1fr !important; /* 图表变成单列排版 */
+            }
+            .chart-box {
+                grid-column: span 1 !important;
+            }
+            #galleryGrid {
+                column-count: 2 !important; /* 手机上画廊变成两列，更好看 */
+                column-gap: 10px !important;
+            }
+            .stats-content {
+                width: 95%;
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -736,4 +775,5 @@
     // 👆 画廊魔法逻辑结束 👆
 </script>
 </body>
+
 </html>
