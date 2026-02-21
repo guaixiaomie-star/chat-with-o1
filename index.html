@@ -288,42 +288,42 @@
         }
 
         /* ================= 📱 手机端适配专属魔法 ================= */
+        /* ================= 📱 手机端适配专属魔法 (升级版：拯救消失的列表) ================= */
         @media screen and (max-width: 768px) {
             body {
-                flex-direction: column; /* 从左右排版变成上下排版 */
+                flex-direction: column; /* 变成上下排版 */
             }
             .sidebar {
-                width: 100%;       /* 侧边栏横向占满屏幕 */
-                height: 35vh;      /* 侧边栏占据屏幕上半部分 (约35%高度) */
+                width: 100%;       
+                flex: 0 0 45vh;    /* 🌟 侧边栏占据 45% 高度，绝对不许被压缩 */
+                height: 45vh;
                 border-right: none;
-                border-bottom: 2px solid var(--border-color);
+                border-bottom: 2px dashed var(--border-color);
             }
+            /* 🌟 在手机上把头部的元素变得更紧凑，省出空间给列表 */
+            .sidebar-header { padding: 10px 15px; }
+            .btn-stats { margin-bottom: 8px; padding: 8px; font-size: 0.85rem; }
+            #statsCounter { margin-bottom: 8px !important; padding: 5px !important; }
+            .search-box { padding: 6px 12px; margin-bottom: 8px; }
+            .tag-btn { padding: 3px 6px; font-size: 0.7rem; }
+            
             .main-chat {
                 width: 100%;
-                height: 65vh;      /* 聊天区域占据屏幕下半部分 */
+                flex: 1;           /* 🌟 剩下的空间全部给聊天区域 */
+                height: 55vh;      
             }
             .messages-container {
-                padding: 15px 15px; /* 缩小手机端聊天两边的空白 */
+                padding: 15px 10px; /* 缩小手机端聊天两边的空白 */
             }
             .bubble {
-                max-width: 92%;    /* 让聊天气泡在手机上更宽一些，不再挤成一团 */
+                max-width: 92%;    /* 让聊天气泡在手机上更宽，不再挤成一团 */
             }
             
-            /* 顺便修复一下统计看板和画廊在手机上的显示，防止被挤坏 */
-            .charts-grid {
-                grid-template-columns: 1fr !important; /* 图表变成单列排版 */
-            }
-            .chart-box {
-                grid-column: span 1 !important;
-            }
-            #galleryGrid {
-                column-count: 2 !important; /* 手机上画廊变成两列，更好看 */
-                column-gap: 10px !important;
-            }
-            .stats-content {
-                width: 95%;
-                padding: 15px;
-            }
+            /* 修复统计看板和画廊在手机上的显示 */
+            .charts-grid { grid-template-columns: 1fr !important; }
+            .chart-box { grid-column: span 1 !important; }
+            #galleryGrid { column-count: 2 !important; column-gap: 10px !important; }
+            .stats-content { width: 95%; padding: 15px; }
         }
     </style>
 </head>
@@ -777,3 +777,4 @@
 </body>
 
 </html>
+
