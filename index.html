@@ -287,44 +287,326 @@
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* ================= 📱 手机端适配专属魔法 ================= */
-        /* ================= 📱 手机端适配专属魔法 (升级版：拯救消失的列表) ================= */
-        @media screen and (max-width: 768px) {
-            body {
-                flex-direction: column; /* 变成上下排版 */
-            }
-            .sidebar {
-                width: 100%;       
-                flex: 0 0 45vh;    /* 🌟 侧边栏占据 45% 高度，绝对不许被压缩 */
-                height: 45vh;
-                border-right: none;
-                border-bottom: 2px dashed var(--border-color);
-            }
-            /* 🌟 在手机上把头部的元素变得更紧凑，省出空间给列表 */
-            .sidebar-header { padding: 10px 15px; }
-            .btn-stats { margin-bottom: 8px; padding: 8px; font-size: 0.85rem; }
-            #statsCounter { margin-bottom: 8px !important; padding: 5px !important; }
-            .search-box { padding: 6px 12px; margin-bottom: 8px; }
-            .tag-btn { padding: 3px 6px; font-size: 0.7rem; }
-            
-            .main-chat {
-                width: 100%;
-                flex: 1;           /* 🌟 剩下的空间全部给聊天区域 */
-                height: 55vh;      
-            }
-            .messages-container {
-                padding: 15px 10px; /* 缩小手机端聊天两边的空白 */
-            }
-            .bubble {
-                max-width: 92%;    /* 让聊天气泡在手机上更宽，不再挤成一团 */
-            }
-            
-            /* 修复统计看板和画廊在手机上的显示 */
-            .charts-grid { grid-template-columns: 1fr !important; }
-            .chart-box { grid-column: span 1 !important; }
-            #galleryGrid { column-count: 2 !important; column-gap: 10px !important; }
-            .stats-content { width: 95%; padding: 15px; }
+        /* ================= 手机端抽屉侧边栏改造 ================= */
+
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .chat-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .chat-header-text {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .current-chat-title {
+        font-size: 1rem;
+        font-weight: bold;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .chat-meta-mobile {
+        font-size: 0.75rem;
+        color: #999;
+        margin-top: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .menu-btn {
+        display: none;
+        width: 40px;
+        height: 40px;
+        border: none;
+        border-radius: 12px;
+        background: #fff;
+        color: var(--text-brown);
+        font-size: 1.2rem;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        flex-shrink: 0;
+    }
+
+    .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.28);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 998;
+    }
+
+    .sidebar-backdrop.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .sidebar {
+        transition: transform 0.28s ease, box-shadow 0.28s ease;
+        z-index: 999;
+    }
+
+    .messages-container {
+        scroll-behavior: smooth;
+    }
+
+    /* 默认桌面端保留左右布局 */
+    @media (min-width: 901px) {
+        .sidebar {
+            position: relative;
+            transform: translateX(0);
         }
+    }
+
+    /* 手机和平板窄屏适配 */
+    @media (max-width: 900px) {
+        body {
+            display: block;
+        }
+
+        .menu-btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: min(82vw, 340px);
+            height: 100vh;
+            transform: translateX(-105%);
+            box-shadow: none;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+            box-shadow: 8px 0 24px rgba(0,0,0,0.12);
+        }
+
+        .main-chat {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .chat-header {
+            padding: 12px 14px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+
+        .messages-container {
+            padding: 14px 12px 28px;
+        }
+
+        .message-row {
+            margin-bottom: 20px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+        }
+
+        .avatar-name {
+            font-size: 0.6rem;
+            margin-top: 4px;
+        }
+
+        .o1-msg .avatar-container {
+            margin-right: 8px;
+        }
+
+        .me-msg .avatar-container {
+            margin-left: 8px;
+        }
+
+        .bubble {
+            max-width: calc(100% - 56px);
+            font-size: 0.92rem;
+            line-height: 1.6;
+            padding: 10px 12px;
+            border-radius: 16px;
+        }
+
+        .msg-time {
+            font-size: 0.6rem;
+            bottom: -16px;
+        }
+
+        .chat-bubble-img {
+            max-height: 260px;
+            border-radius: 10px;
+        }
+
+        .sidebar-header {
+            padding: 16px 14px;
+        }
+
+        .btn-stats {
+            padding: 11px 10px;
+            font-size: 0.92rem;
+            border-radius: 14px;
+        }
+
+        .search-box {
+            font-size: 0.92rem;
+            padding: 10px 12px;
+        }
+
+        .filter-tags {
+            justify-content: flex-start;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .tag-btn {
+            font-size: 0.72rem;
+            padding: 5px 9px;
+        }
+
+        .session-list {
+            padding: 10px 10px 20px;
+        }
+
+        .session-item {
+            padding: 11px;
+            margin-bottom: 8px;
+            border-radius: 14px;
+        }
+
+        .session-title {
+            font-size: 0.88rem;
+        }
+
+        .session-meta {
+            font-size: 0.68rem;
+            gap: 8px;
+        }
+
+        .stats-content {
+            width: calc(100vw - 24px);
+            max-width: none;
+            max-height: 88vh;
+            padding: 20px 14px 16px;
+            border-radius: 18px;
+        }
+
+        .charts-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .chart-box {
+            padding: 14px;
+        }
+
+        .chart-box[style*="grid-column: span 2;"] {
+            grid-column: auto !important;
+        }
+
+        .canvas-container {
+            height: 240px;
+            max-height: 240px;
+        }
+
+        #galleryGrid {
+            column-count: 2 !important;
+            column-gap: 12px !important;
+            padding: 12px !important;
+        }
+
+        .lightbox-close {
+            top: 16px;
+            right: 20px;
+            font-size: 38px;
+        }
+
+        .image-lightbox img {
+            max-width: 94%;
+            max-height: 82vh;
+        }
+
+        .empty-state {
+            padding: 20px;
+            text-align: center;
+        }
+
+        .empty-state img {
+            width: 84px !important;
+        }
+    }
+
+    @media (max-width: 520px) {
+        .sidebar {
+            width: 88vw;
+        }
+
+        .chat-header {
+            padding: 10px 10px;
+        }
+
+        .current-chat-title {
+            font-size: 0.95rem;
+        }
+
+        .chat-meta-mobile {
+            font-size: 0.68rem;
+        }
+
+        .messages-container {
+            padding: 12px 8px 24px;
+        }
+
+        .bubble {
+            max-width: calc(100% - 50px);
+            font-size: 0.9rem;
+            padding: 9px 11px;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+        }
+
+        .avatar-name {
+            display: none;
+        }
+
+        .chat-bubble-img {
+            max-height: 220px;
+        }
+
+        .stats-content {
+            width: calc(100vw - 16px);
+            padding: 18px 10px 14px;
+        }
+
+        #galleryGrid {
+            column-count: 1 !important;
+        }
+
+        .word-cloud-container {
+            gap: 10px;
+            padding: 12px;
+        }
+    }
     </style>
 </head>
 <body>
@@ -359,8 +641,13 @@
 
     <main class="main-chat">
         <header class="chat-header">
-            <div class="current-chat-title" id="chatTitle">📂 选择一段回忆...</div>
-            <div id="chatMeta" style="font-size: 0.75rem; color: #999;"></div>
+            <div class="chat-header-left">
+                <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+                <div class="chat-header-text">
+                    <div class="current-chat-title" id="chatTitle">📂 选择一段回忆...</div>
+                    <div id="chatMeta" class="chat-meta-mobile"></div>
+                </div>
+            </div>
         </header>
         <div class="messages-container" id="messagesArea">
             <div class="empty-state">
@@ -370,7 +657,7 @@
             </div>
         </div>
     </main>
-
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
     <div id="statsModal" class="stats-modal" style="display: none;">
         <div class="stats-content">
             <span class="close-stats" onclick="closeStats()">&times;</span>
@@ -478,6 +765,10 @@
                 document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
                 item.classList.add('active');
                 loadMessages(session, searchKeyword);
+
+                if (isMobileView()) {
+                    closeSidebar();
+                }
             };
             sessionListEl.appendChild(item);
         });
@@ -538,7 +829,7 @@
             // 🖼️ 3. 处理图片内容 (只要 JSON 里有 image 字段，这里就会生效！)
             let imageHtml = '';
             if (msg.image) {
-                imageHtml = `<div class="chat-image-container"><img src="${msg.image}" class="chat-bubble-img" alt="回忆图片" onclick="openImageLightbox(this.src)"></div>`;
+                imageHtml = `<div class="chat-image-container"><img src="${msg.image}" class="chat-bubble-img" alt="回忆图片" onclick="event.stopPropagation(); openImageLightbox(this.src)"></div>`;
             }
 
             // 🧩 4. 组合渲染气泡 (加入了 avatar-container 和 avatar-name)
@@ -551,6 +842,7 @@
         
         // 自动滚动到最底部
         messagesArea.scrollTop = messagesArea.scrollHeight;
+        //messagesArea.scrollTop = 0;
     }
 
     // 🧠 切换思考显示
@@ -576,6 +868,11 @@
 
     // 初始渲染列表
     renderSidebar();
+    if (allData.length > 0) {
+        loadMessages(allData[0]);
+        const firstItem = document.querySelector('.session-item');
+        if (firstItem) firstItem.classList.add('active');
+    }
 
     // ================= 📊 数据看板核心逻辑 =================
     
@@ -759,7 +1056,7 @@
             imgCard.onmouseout = () => imgCard.style.transform = "none";
             
             imgCard.innerHTML = `
-                <img src="${imgData.src}" style="width: 100%; border-radius: 8px; margin-bottom: 10px;" onclick="openImageLightbox(this.src)">
+                <img src="${imgData.src}" style="width: 100%; border-radius: 8px; margin-bottom: 10px;" onclick="event.stopPropagation(); openImageLightbox(this.src)">
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #999;">
                     <span style="background: #fff3cd; padding: 2px 8px; border-radius: 10px; color: #d99a00;">${imgData.role}</span>
                     <span>${imgData.time}</span>
@@ -773,8 +1070,46 @@
         document.getElementById('galleryModal').style.display = 'none';
     }
     // 👆 画廊魔法逻辑结束 👆
+
+    // ================= 📱 手机端侧边栏控制 =================
+    function toggleSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        const isOpen = sidebar.classList.contains('open');
+
+        if (isOpen) {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('show');
+            document.body.style.overflow = '';
+        } else {
+            sidebar.classList.add('open');
+            backdrop.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        sidebar.classList.remove('open');
+        backdrop.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    // 手机上点击会话后自动收起侧边栏
+    function isMobileView() {
+        return window.innerWidth <= 900;
+    }
+
+    document.getElementById('galleryModal').addEventListener('click', function(e) {
+        if (e.target === this) closeGallery();
+    });
+
+    document.getElementById('imageLightbox').addEventListener('click', function(e) {
+        if (e.target === this || e.target.classList.contains('lightbox-close')) {
+            closeImageLightbox();
+        }
+    });
 </script>
 </body>
-
 </html>
-
