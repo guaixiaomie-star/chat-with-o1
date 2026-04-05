@@ -359,7 +359,7 @@
     }
 
     .messages-container {
-        scroll-behavior: smooth;
+        scroll-behavior: auto;
     }
 
     /* 默认桌面端保留左右布局 */
@@ -607,6 +607,29 @@
             padding: 12px;
         }
     }
+
+    .search-hit {
+        background: rgba(255, 80, 80, 0.16);
+        color: #d93025;
+        padding: 0 2px;
+        border-radius: 4px;
+        font-weight: 700;
+    }
+
+    .message-row.keyword-target .bubble {
+        box-shadow: 0 0 0 2px rgba(255, 99, 99, 0.35), 0 4px 14px rgba(255, 99, 99, 0.12);
+        border: 1px solid rgba(255, 99, 99, 0.28);
+    }
+
+    .message-row.keyword-target {
+        animation: keywordFlash 1.2s ease;
+    }
+
+    @keyframes keywordFlash {
+        0% { transform: scale(0.985); }
+        35% { transform: scale(1.01); }
+        100% { transform: scale(1); }
+    }
     </style>
 </head>
 <body>
@@ -741,9 +764,12 @@
         
         const filteredData = allData.filter(session => {
             const matchFilter = (filter === 'all' || session.source === filter);
-            const matchSearch = !searchKeyword || 
-                               (session.title && session.title.toLowerCase().includes(lowerKey)) || 
-                               (session.messages && session.messages.some(m => m.content && m.content.toLowerCase().includes(lowerKey)));
+            const matchSearch = !searchKeyword ||
+                   (session.title && session.title.toLowerCase().includes(lowerKey)) ||
+                   (session.messages && session.messages.some(m =>
+                       (m.content && m.content.toLowerCase().includes(lowerKey)) ||
+                       (m.reasoning && m.reasoning.toLowerCase().includes(lowerKey))
+                   ));
             return matchFilter && matchSearch;
         });
 
@@ -774,6 +800,16 @@
         });
     }
 
+    function escapeRegExp(s) {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function highlightKeyword(s, keyword) {
+        if (!s || !keyword) return s || '';
+        const reg = new RegExp(`(${escapeRegExp(keyword)})`, 'gi');
+        return s.replace(reg, '<span class="search-hit">$1</span>');
+    }
+
     // 💬 加载聊天记录
     function loadMessages(session, keyword = '') {
         chatTitleEl.innerText = session.title || '回忆碎片';
@@ -782,19 +818,18 @@
 
         if (!session.messages) return;
 
+        const kw = (keyword || '').trim();
+        let firstHitRow = null;
+
         session.messages.forEach(msg => {
             const row = document.createElement('div');
-            
-            // 兼容性识别
-            const isO1 = (msg.role && msg.role.toLowerCase().includes('o1')) || msg.role === 'assistant';
-            
-            row.className = `message-row ${isO1 ? 'o1-msg' : 'me-msg'}`;
-            const avatarSrc = isO1 ? 'avatar/o1.png' : 'avatar/guaixiaomie.jpg'; 
 
-            // 🌟 新增：动态计算显示的名字
+            const isO1 = (msg.role && msg.role.toLowerCase().includes('o1')) || msg.role === 'assistant';
+            row.className = `message-row ${isO1 ? 'o1-msg' : 'me-msg'}`;
+            const avatarSrc = isO1 ? 'avatar/o1.png' : 'avatar/guaixiaomie.jpg';
+
             let displayName = '乖小咩';
             if (isO1) {
-                // 读取 JSON 里存好的 role 字段来显示具体的名字
                 if (msg.role && msg.role.toLowerCase().includes('pro')) {
                     displayName = 'o1 pro';
                 } else if (msg.role && msg.role.toLowerCase().includes('mini')) {
@@ -802,47 +837,61 @@
                 } else if (msg.role && msg.role.toLowerCase().includes('preview')) {
                     displayName = 'o1 preview';
                 } else {
-                    displayName = 'o1'; 
+                    displayName = 'o1';
                 }
             }
 
-            // 🧠 1. 处理思考过程
             let reasoningHTML = '';
             if (msg.reasoning) {
                 let cleanReasoning = msg.reasoning
                     .replace(/^[\s\n\r]+|[\s\n\r]+$/g, '')
                     .replace(/^(<br\s*\/?>)+|(<br\s*\/?>)+$/gi, '')
                     .trim();
-                
+
                 if (cleanReasoning) {
-                    reasoningHTML = `<div class="reasoning-toggle" onclick="toggleReasoning(this)">已深度思考 (点击展开)</div><div class="reasoning-box">${cleanReasoning}</div>`;
+                    const reasoningContent = kw ? highlightKeyword(cleanReasoning, kw) : cleanReasoning;
+                    reasoningHTML = `<div class="reasoning-toggle" onclick="toggleReasoning(this)">已深度思考 (点击展开)</div><div class="reasoning-box">${reasoningContent}</div>`;
                 }
             }
 
-            // 📝 2. 处理文字内容
-            let contentHtml = msg.content || '';
-            if (keyword && contentHtml) {
-                const reg = new RegExp(`(${keyword})`, 'gi');
-                contentHtml = contentHtml.replace(reg, '<mark style="background:#fff3cd">$1</mark>');
-            }
+            let rawContent = msg.content || '';
+            let contentHtml = kw ? highlightKeyword(rawContent, kw) : rawContent;
 
-            // 🖼️ 3. 处理图片内容 (只要 JSON 里有 image 字段，这里就会生效！)
             let imageHtml = '';
             if (msg.image) {
                 imageHtml = `<div class="chat-image-container"><img src="${msg.image}" class="chat-bubble-img" alt="回忆图片" onclick="event.stopPropagation(); openImageLightbox(this.src)"></div>`;
             }
 
-            // 🧩 4. 组合渲染气泡 (加入了 avatar-container 和 avatar-name)
+            const hitInContent = kw && rawContent && rawContent.toLowerCase().includes(kw.toLowerCase());
+            const hitInReasoning = kw && msg.reasoning && msg.reasoning.toLowerCase().includes(kw.toLowerCase());
+
+            if ((hitInContent || hitInReasoning) && !firstHitRow) {
+                row.classList.add('keyword-target');
+                firstHitRow = row;
+            }
+
             row.innerHTML = `
-                <div class="avatar-container"><img src="${avatarSrc}" class="avatar" onerror="this.src='https://api.dicebear.com/7.x/adventurer/svg?seed=Lucky'"><div class="avatar-name">${displayName}</div></div>
+                <div class="avatar-container">
+                    <img src="${avatarSrc}" class="avatar" onerror="this.src='https://api.dicebear.com/7.x/adventurer/svg?seed=Lucky'">
+                    <div class="avatar-name">${displayName}</div>
+                </div>
                 <div class="bubble">${reasoningHTML}${contentHtml ? `<div class="text-content" style="margin-bottom: 5px;">${contentHtml}</div>` : ''}${imageHtml}<div class="msg-time">${msg.time || ''}</div></div>
             `;
+
             messagesArea.appendChild(row);
         });
-        
-        // 自动滚动到最底部
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-        //messagesArea.scrollTop = 0;
+
+        requestAnimationFrame(() => {
+            if (firstHitRow) {
+                firstHitRow.scrollIntoView({
+                    block: 'center',
+                    behavior: 'auto'
+                });
+            } else {
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+                //messagesArea.scrollTop = 0;
+            }
+        });
     }
 
     // 🧠 切换思考显示
