@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>乖小咩 & o1 的时空档案馆</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="chart.umd.min.js"></script>
     <style>
         :root {
             --primary-yellow: rgb(247, 214, 21);
@@ -647,6 +647,11 @@
                 <div>✨ 珍藏了 <strong id="totalSessionCount" style="color: var(--primary-yellow); font-size: 1.1rem;">0</strong> 个专属回忆 ✨</div>
                 <div>💌 共计 <strong id="totalMessageCount" style="color: var(--primary-yellow); font-size: 1.1rem;">0</strong> 条心动消息</div>
             </div>
+            <div id="filterCounter" style="font-size: 0.78rem; color: var(--text-grey); margin-bottom: 10px; padding: 8px 10px; background: #fffdf6; border-radius: 10px; border: 1px dashed var(--border-color); text-align: center; line-height: 1.7;">
+                当前显示 <strong id="currentSessionCount" style="color: var(--primary-yellow);">0</strong> 个聊天框
+                <br>
+                共计 <strong id="currentMessageCount" style="color: var(--primary-yellow);">0</strong> 条消息
+            </div>
             
             <input type="text" class="search-box" placeholder="🔍 搜索标题或内容..." id="searchInput">
             <div class="filter-tags">
@@ -726,8 +731,8 @@
     </div>
 
 <script src="data1.js"></script>         
-<script src="data_cherry1.js"></script>
-<script src="data_rikka.js"></script>
+<script src="data_cherry.js"></script>
+<script src="data_rikka3.js"></script>
 <script src="data_openai2.js"></script>
 <script src="data_closechat2.js"></script>
 <script src="data_poe.js"></script>
@@ -773,6 +778,21 @@
             return matchFilter && matchSearch;
         });
 
+        const currentSessionCountEl = document.getElementById('currentSessionCount');
+        const currentMessageCountEl = document.getElementById('currentMessageCount');
+
+        const currentMessageCount = filteredData.reduce((sum, session) => {
+            return sum + (session.messages ? session.messages.length : 0);
+        }, 0);
+
+        if (currentSessionCountEl) {
+            currentSessionCountEl.innerText = filteredData.length.toLocaleString();
+        }
+
+        if (currentMessageCountEl) {
+            currentMessageCountEl.innerText = currentMessageCount.toLocaleString();
+        }
+
         filteredData.forEach(session => {
             const item = document.createElement('div');
             item.className = 'session-item';
@@ -780,13 +800,17 @@
             // 自动计算 badge 样式名
             let badgeClass = `badge-${(session.source || 'default').toLowerCase()}`;
 
+            const msgCount = session.messages ? session.messages.length : 0;
+
             item.innerHTML = `
                 <div class="session-title">${session.title || '未命名对话'}</div>
                 <div class="session-meta">
                     <span class="source-badge ${badgeClass}">${session.source || '未知'}</span>
+                    <span>  ${msgCount.toLocaleString()} 条</span>
                     <span>${(session.date || '').split(' ')[0]}</span> 
                 </div>
             `;
+
             item.onclick = () => {
                 document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
                 item.classList.add('active');
