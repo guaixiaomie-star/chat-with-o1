@@ -746,8 +746,110 @@
     const list5 = (typeof closechatData !== 'undefined') ? closechatData : [];
     const list6 = (typeof PoeData !== 'undefined') ? PoeData : [];
 
+    // ================= 🍓 RikkaHub 导入 Chatbox 记录去重逻辑 =================
+    // 说明：
+    // 1. list1 = Chatbox 原始数据
+    // 2. list3 = RikkaHub 数据
+    // 3. 如果 RikkaHub 里有从 Chatbox 导入的重复会话，先尝试按会话指纹隐藏
+    // 4. 统计看板里再自动扣掉 2026-05 的 Chatbox 全部导入量
+
+    function normalizeTextForCompare(text) {
+        return (text || '')
+            .replace(/\s+/g, '')
+            .replace(/[，。！？、,.!?~～…（）()【】\[\]「」""''“”‘’：:；;]/g, '')
+            .toLowerCase();
+    }
+
+    function getSessionFingerprint(session) {
+        const messages = session.messages || [];
+
+        return messages
+            .filter(m => m && m.content)
+            .slice(0, 6)
+            .map(m => {
+                const role = (m.role || '').toLowerCase().includes('o1') || m.role === 'assistant'
+                    ? 'assistant'
+                    : 'user';
+
+                const content = normalizeTextForCompare(m.content).slice(0, 120);
+
+                return `${role}:${content}`;
+            })
+            .join('|');
+    }
+
+    function getSessionLooseFingerprint(session) {
+        const messages = session.messages || [];
+
+        return messages
+            .filter(m => m && m.content)
+            .slice(0, 8)
+            .map(m => normalizeTextForCompare(m.content).slice(0, 100))
+            .join('|');
+    }
+
+    const chatboxFingerprints = new Set(list1.map(getSessionFingerprint).filter(Boolean));
+    const chatboxLooseFingerprints = new Set(list1.map(getSessionLooseFingerprint).filter(Boolean));
+
+    function isImportedFromChatboxInRikka(session) {
+        if (!session || session.source !== 'Rikka') return false;
+
+        const fp = getSessionFingerprint(session);
+        const looseFp = getSessionLooseFingerprint(session);
+
+        return chatboxFingerprints.has(fp) || chatboxLooseFingerprints.has(looseFp);
+    }
+
+    const filteredRikkaData = list3.filter(session => !isImportedFromChatboxInRikka(session));
+    const hiddenImportedRikkaData = list3.filter(isImportedFromChatboxInRikka);
+
+    function countMessagesByMonthFromSessions(sessionList) {
+        const counts = {};
+        let total = 0;
+
+        sessionList.forEach(session => {
+            (session.messages || []).forEach(msg => {
+                total++;
+
+                const month = msg.time
+                    ? msg.time.substring(0, 7)
+                    : (session.date || '').substring(0, 7);
+
+                if (month) {
+                    counts[month] = (counts[month] || 0) + 1;
+                }
+            });
+        });
+
+        return {
+            total,
+            counts
+        };
+    }
+
+    function countAllMessagesFromList(dataList) {
+        let count = 0;
+
+        dataList.forEach(session => {
+            count += session.messages ? session.messages.length : 0;
+        });
+
+        return count;
+    }
+
+    const hiddenImportedStats = countMessagesByMonthFromSessions(hiddenImportedRikkaData);
+    const hiddenImportedByMonth = hiddenImportedStats.counts;
+
+    console.log('Rikka 原始数量：', list3.length);
+    console.log('Rikka 去掉 Chatbox 导入后数量：', filteredRikkaData.length);
+    console.log('被隐藏的 Rikka 导入记录：', hiddenImportedRikkaData);
+    console.log('被隐藏的 Rikka 导入记录总消息数：', hiddenImportedStats.total);
+    console.log('被隐藏的 Rikka 导入记录按月份统计：', hiddenImportedByMonth);
+    console.log('2026-05 已经通过会话去重减掉：', hiddenImportedByMonth['2026-05'] || 0);
+
     // 合并并按时间倒序排列
-    const allData = [...list1, ...list2, ...list3, ...list4, ...list5, ...list6]
+    // ✅ 注意：这里用 filteredRikkaData，而不是 list3
+    const allData = [...list1, ...list2, ...filteredRikkaData, ...list4, ...list5, ...list6]
                     .sort((a, b) => b.timestamp - a.timestamp);
 
     // 🌟 2. 统计总数 (主题数 & 消息数)
@@ -964,11 +1066,10 @@
         if(e.target === this) closeStats();
     });
 
-    let chartsRendered = false; 
+    let platformChartInstance = null;
+    let monthlyChartInstance = null;
 
     function renderCharts() {
-        if(chartsRendered) return;
-        
         let platformCounts = {};
         let monthlyCounts = {};
         
@@ -1010,10 +1111,54 @@
             }
         });
 
+        // ================= 🍓 关键修正：2026-05 自动扣掉“Chatbox 全部导入量” =================
+        // 乖小咩的真实情况：
+        // RikkaHub 是在 2026-05 导入了 Chatbox 的全部旧聊天记录。
+        // 所以 2026-05 里多出来的不是“Chatbox 五月消息”，
+        // 而是“Chatbox 全部消息被导入后堆到了 Rikka 的 2026-05”。
+
+        const targetDuplicateMonth = '2026-05';
+
+        // Chatbox 全部消息数：也就是导入重复基准，大概 1500 多条
+        const chatboxTotalCount = countAllMessagesFromList(list1);
+
+        // 如果前面的会话指纹去重已经隐藏了一部分 Rikka 导入记录，就不要重复扣
+        const alreadyHiddenTotalCount = hiddenImportedStats ? hiddenImportedStats.total : 0;
+
+        // 统计图还需要额外扣掉的数量
+        const extraSubtract = Math.max(0, chatboxTotalCount - alreadyHiddenTotalCount);
+
+        // 只从 2026-05 这个峰值月份扣，因为 RikkaHub 是 2026-05 导入的
+        if (monthlyCounts[targetDuplicateMonth]) {
+            monthlyCounts[targetDuplicateMonth] = Math.max(0, monthlyCounts[targetDuplicateMonth] - extraSubtract);
+        }
+
+        // 平台饼图里，Rikka 也要扣掉这批导入重复量
+        if (platformCounts['Rikka']) {
+            platformCounts['Rikka'] = Math.max(0, platformCounts['Rikka'] - extraSubtract);
+        }
+
+        console.log('统计看板：Chatbox 全部消息数，也就是导入重复基准：', chatboxTotalCount);
+        console.log('统计看板：会话去重已经隐藏的导入消息总数：', alreadyHiddenTotalCount);
+        console.log('统计看板：本次从 2026-05 额外扣掉：', extraSubtract);
+        console.log('统计看板最终 monthlyCounts：', monthlyCounts);
+        console.log('统计看板 2026-05 最终显示：', monthlyCounts[targetDuplicateMonth]);
+
+        // 如果重复打开统计面板，先销毁旧图，避免 Chart.js 叠图/缓存
+        if (platformChartInstance) {
+            platformChartInstance.destroy();
+            platformChartInstance = null;
+        }
+
+        if (monthlyChartInstance) {
+            monthlyChartInstance.destroy();
+            monthlyChartInstance = null;
+        }
+
         // 绘制饼图 (平台分布)
         const platformCtx = document.getElementById('platformChart');
         if (platformCtx) {
-            new Chart(platformCtx, {
+            platformChartInstance = new Chart(platformCtx, {
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(platformCounts),
@@ -1033,7 +1178,7 @@
             const sortedMonths = Object.keys(monthlyCounts).sort();
             const monthData = sortedMonths.map(m => monthlyCounts[m]);
             
-            new Chart(monthlyCtx, {
+            monthlyChartInstance = new Chart(monthlyCtx, {
                 type: 'line',
                 data: {
                     labels: sortedMonths,
@@ -1061,6 +1206,8 @@
 
         // 渲染甜蜜词云
         const cloudContainer = document.getElementById('wordCloud');
+        cloudContainer.innerHTML = '';
+
         const maxFreq = Math.max(...Object.values(wordFrequencies)) || 1; 
         const colors = ['#f06292', '#ba68c8', '#4fc3f7', '#4db6ac', '#fbc02d', '#ff8a65'];
 
@@ -1082,8 +1229,6 @@
                 cloudContainer.appendChild(span);
             }
         });
-
-        chartsRendered = true;
     }
 
     // ================= 💡 新增：图片灯箱交互逻辑 =================
