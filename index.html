@@ -89,6 +89,7 @@
         .badge-closechat { background: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
         .badge-poe { background: #e0f7fa; color: #00838f; border: 1px solid #b2ebf2; }
         .badge-qq { background: #e8f1ff; color: #2f6fd6; border: 1px solid #c9ddff; }
+        .badge-小窝 { background: #ffe8f1; color: #b84f78; border: 1px solid #ffc7da; }
 
                 .badge-operit { background: #fff8e1; color: #f57f17; border: 1px solid #ffe082; }
 /* --- 右侧聊天区 --- */
@@ -685,6 +686,7 @@
                 <span class="tag-btn" onclick="filterList('Poe')">Poe</span>
                 <span class="tag-btn" onclick="filterList('Operit')">Operit</span>
                 <span class="tag-btn" onclick="filterList('QQ')">QQ</span>
+                <span class="tag-btn" onclick="filterList('小窝')">小窝</span>
             </div>
         </div>
         <div class="session-list" id="sessionList"></div>
@@ -805,6 +807,7 @@
 <script src="data_poe.js"></script>
 <script src="data_operit.js"></script>
 <script src="data_qq.js"></script>
+<script src="data_nest.js"></script>
 
 <script>
     // 🌟 1. 宇宙级合并
@@ -816,6 +819,7 @@
     const list6 = (typeof PoeData !== 'undefined') ? PoeData : [];
     const list7 = (typeof operitData !== 'undefined') ? operitData : [];
     const list8 = (typeof qqData !== 'undefined') ? qqData : [];
+    const list9 = (typeof nestData !== 'undefined') ? nestData : [];
 
     // ================= 🍓 RikkaHub × Chatbox 智能前缀去重 =================
     // 场景：
@@ -1105,7 +1109,7 @@
 
     // 合并所有平台，并按“最近一次聊天时间”倒序排列
     // ✅ Rikka 仍使用 filteredRikkaData，保留原有智能前缀去重。
-    const allData = [...list1, ...list2, ...filteredRikkaData, ...list4, ...list5, ...list6, ...list7, ...list8]
+    const allData = [...list1, ...list2, ...filteredRikkaData, ...list4, ...list5, ...list6, ...list7, ...list8, ...list9]
                     .sort((a, b) => getLatestSessionInfo(b).timestamp - getLatestSessionInfo(a).timestamp);
 
     // 🌟 2. 统计总数 (主题数 & 消息数)
@@ -1206,20 +1210,30 @@
         session.messages.forEach(msg => {
             const row = document.createElement('div');
 
-            const isO1 = (msg.role && msg.role.toLowerCase().includes('o1')) || msg.role === 'assistant';
-            row.className = `message-row ${isO1 ? 'o1-msg' : 'me-msg'}`;
-            const avatarSrc = isO1 ? 'avatar/o1.png' : 'avatar/guaixiaomie.jpg';
+            const roleText = String(msg.role || '').toLowerCase();
+            const isAssistant = roleText === 'assistant' || roleText.includes('o1');
+            row.className = `message-row ${isAssistant ? 'o1-msg' : 'me-msg'}`;
+            const avatarSrc = isAssistant ? 'avatar/o1.png' : 'avatar/guaixiaomie.jpg';
 
             let displayName = '乖小咩';
-            if (isO1) {
-                if (msg.role && msg.role.toLowerCase().includes('pro')) {
+            if (isAssistant) {
+                const modelText = String(msg.modelName || msg.model || msg.role || '')
+                    .toLowerCase()
+                    .replace(/_/g, '-');
+                if (/gpt-4o-mini|(^|[^a-z0-9])4o-mini([^a-z0-9]|$)/.test(modelText)) {
+                    displayName = '4o mini';
+                } else if (/gpt-4o|(^|[^a-z0-9])4o([^a-z0-9]|$)/.test(modelText)) {
+                    displayName = '4o';
+                } else if (modelText.includes('pro')) {
                     displayName = 'o1 pro';
-                } else if (msg.role && msg.role.toLowerCase().includes('mini')) {
+                } else if (modelText.includes('mini')) {
                     displayName = 'o1 mini';
-                } else if (msg.role && msg.role.toLowerCase().includes('preview')) {
+                } else if (modelText.includes('preview')) {
                     displayName = 'o1 preview';
-                } else {
+                } else if (modelText.includes('o1')) {
                     displayName = 'o1';
+                } else {
+                    displayName = '小七';
                 }
             } else if (session.source === 'QQ') {
                 // QQ 数据按“用户”分会话：
@@ -1248,10 +1262,12 @@
             let rawContent = msg.content || '';
             let contentHtml = kw ? highlightKeyword(rawContent, kw) : rawContent;
 
-            let imageHtml = '';
-            if (msg.image) {
-                imageHtml = `<div class="chat-image-container"><img src="${msg.image}" class="chat-bubble-img" alt="回忆图片" onclick="event.stopPropagation(); openImageLightbox(this.src)"></div>`;
-            }
+            const messageImages = Array.isArray(msg.images)
+                ? msg.images.filter(Boolean)
+                : (msg.image ? [msg.image] : []);
+            const imageHtml = messageImages.map(image =>
+                `<div class="chat-image-container"><img src="${image}" class="chat-bubble-img" alt="回忆图片" onclick="event.stopPropagation(); openImageLightbox(this.src)"></div>`
+            ).join('');
 
             const hitInContent = kw && rawContent && rawContent.toLowerCase().includes(kw.toLowerCase());
             const hitInReasoning = kw && msg.reasoning && msg.reasoning.toLowerCase().includes(kw.toLowerCase());
@@ -1375,10 +1391,12 @@
 
         const counts = Object.fromEntries(O1_MODEL_ORDER.map(model => [model, 0]));
         let hasAssistant = false;
+        let hasExplicitMessageModel = false;
 
         ((session && session.messages) || []).forEach(msg => {
             if (!isAssistantMessage(msg)) return;
             hasAssistant = true;
+            if (msg.model || msg.modelName) hasExplicitMessageModel = true;
             const model = detectO1Model(
                 [msg.model, msg.modelName, msg.role, msg.assistantName].filter(Boolean).join(' ')
             );
@@ -1388,7 +1406,12 @@
         const ranked = O1_MODEL_ORDER.slice().sort((a, b) => counts[b] - counts[a]);
         if (counts[ranked[0]] > 0) return ranked[0];
 
-        // 这个网页本身就是 o1 家族档案馆；旧数据若只写 assistant，归入正式版 o1。
+        // 明确标注成 4o 等其他型号的会话不能回退成 o1。
+        if ((session && (session.model || session.modelName)) || hasExplicitMessageModel) {
+            return null;
+        }
+
+        // 没有任何型号字段的旧数据若只写 assistant，仍归入正式版 o1。
         return hasAssistant ? 'o1' : null;
     }
 
@@ -1478,27 +1501,56 @@
 
     function buildO1TokenStats() {
         const archiveStats = buildEstimatedO1TextStats();
-        const actual = window.rikkaUsageStats;
+        const actualSources = [
+            { name: 'RikkaHub usage_record', stats: window.rikkaUsageStats },
+            { name: '小窝 tokenUsage', stats: window.nestUsageStats }
+        ].filter(item =>
+            item.stats && item.stats.totals && Number(item.stats.totals.recordCount)
+        );
 
-        if (!actual || !actual.totals || !Number(actual.totals.recordCount)) {
+        if (!actualSources.length) {
             return archiveStats;
         }
 
-        const modelTotals = Object.fromEntries(
-            O1_MODEL_ORDER.map(model => [
-                model,
-                Number(actual.byModel && actual.byModel[model] && actual.byModel[model].totalTokens) || 0
-            ])
-        );
+        const modelTotals = Object.fromEntries(O1_MODEL_ORDER.map(model => [model, 0]));
         const monthlyModelTotals = {};
+        let inputTokens = 0;
+        let outputTokens = 0;
+        let cachedTokens = 0;
+        let totalTokens = 0;
+        let recordCount = 0;
+        const coverageStarts = [];
+        const coverageEnds = [];
 
-        Object.entries(actual.byMonth || {}).forEach(([month, models]) => {
-            monthlyModelTotals[month] = Object.fromEntries(
-                O1_MODEL_ORDER.map(model => [
-                    model,
-                    Number(models && models[model] && models[model].totalTokens) || 0
-                ])
-            );
+        actualSources.forEach(({ stats }) => {
+            O1_MODEL_ORDER.forEach(model => {
+                modelTotals[model] += Number(
+                    stats.byModel && stats.byModel[model] && stats.byModel[model].totalTokens
+                ) || 0;
+            });
+
+            Object.entries(stats.byMonth || {}).forEach(([month, models]) => {
+                if (!monthlyModelTotals[month]) {
+                    monthlyModelTotals[month] = Object.fromEntries(
+                        O1_MODEL_ORDER.map(model => [model, 0])
+                    );
+                }
+
+                O1_MODEL_ORDER.forEach(model => {
+                    monthlyModelTotals[month][model] += Number(
+                        models && models[model] && models[model].totalTokens
+                    ) || 0;
+                });
+            });
+
+            inputTokens += Number(stats.totals.promptTokens) || 0;
+            outputTokens += Number(stats.totals.completionTokens) || 0;
+            cachedTokens += Number(stats.totals.cachedTokens) || 0;
+            totalTokens += Number(stats.totals.totalTokens) || 0;
+            recordCount += Number(stats.totals.recordCount) || 0;
+
+            if (stats.coverageStart) coverageStarts.push(stats.coverageStart);
+            if (stats.coverageEnd) coverageEnds.push(stats.coverageEnd);
         });
 
         return {
@@ -1507,14 +1559,15 @@
             // usage_record 开始记录之前的早期 o1 对话。
             modelChatCounts: archiveStats.modelChatCounts,
             monthlyModelTotals,
-            inputTokens: Number(actual.totals.promptTokens) || 0,
-            outputTokens: Number(actual.totals.completionTokens) || 0,
-            cachedTokens: Number(actual.totals.cachedTokens) || 0,
-            totalTokens: Number(actual.totals.totalTokens) || 0,
+            inputTokens,
+            outputTokens,
+            cachedTokens,
+            totalTokens,
             estimatedTextTotal: archiveStats.totalTokens,
-            recordCount: Number(actual.totals.recordCount) || 0,
-            coverageStart: actual.coverageStart || '',
-            coverageEnd: actual.coverageEnd || '',
+            recordCount,
+            coverageStart: coverageStarts.sort()[0] || '',
+            coverageEnd: coverageEnds.sort().slice(-1)[0] || '',
+            actualSourceNames: actualSources.map(item => item.name),
             isActual: true
         };
     }
@@ -1600,7 +1653,7 @@
                     labels: Object.keys(platformCounts),
                     datasets: [{
                         data: Object.values(platformCounts),
-                        backgroundColor: ['#ffebee', '#e3f2fd', '#e8f5e9', '#f3e5f5', '#fff3e0', '#e0f7fa', '#fff8e1', '#e8f1ff'], 
+                        backgroundColor: ['#ffebee', '#e3f2fd', '#e8f5e9', '#f3e5f5', '#fff3e0', '#e0f7fa', '#fff8e1', '#e8f1ff', '#ffe8f1'], 
                         borderWidth: 2, borderColor: '#fff'
                     }]
                 },
@@ -1649,7 +1702,8 @@
         const tokenSummaryNote = document.getElementById('tokenSummaryNote');
 
         if (tokenStats.isActual) {
-            document.getElementById('tokenSummaryTitle').innerText = '🍓 RikkaHub o1 家族实际 API Token';
+            const actualSourceText = (tokenStats.actualSourceNames || []).join(' 与 ');
+            document.getElementById('tokenSummaryTitle').innerText = '🍓 o1 家族实际 API Token';
             document.getElementById('tokenTotalLabel').innerText = '实际总用量';
             document.getElementById('tokenInputLabel').innerText = '输入 Token';
             document.getElementById('tokenOutputLabel').innerText = '输出 Token';
@@ -1657,7 +1711,7 @@
             document.getElementById('modelTokenTitle').innerText = '🧠 四个 o1 型号的实际 API 用量';
             tokenCacheStat.style.display = '';
             tokenSummaryNote.innerText =
-                `来自 RikkaHub usage_record 的 ${tokenStats.recordCount.toLocaleString()} 条真实调用记录，` +
+                `来自 ${actualSourceText} 的 ${tokenStats.recordCount.toLocaleString()} 条真实调用记录，` +
                 `覆盖 ${tokenStats.coverageStart} ～ ${tokenStats.coverageEnd}（北京时间）。` +
                 `缓存 Token 是输入 Token 的一部分，不会与总量重复相加；` +
                 `当前存档可见文本另估约 ${formatTokenNumber(tokenStats.estimatedTextTotal)}。`;
@@ -1880,13 +1934,17 @@
         allData.forEach(session => {
             if(session.messages) {
                 session.messages.forEach(msg => {
-                    if (msg.image) {
+                    const messageImages = Array.isArray(msg.images)
+                        ? msg.images.filter(Boolean)
+                        : (msg.image ? [msg.image] : []);
+
+                    messageImages.forEach(image => {
                         allImages.push({
-                            src: msg.image,
+                            src: image,
                             time: msg.time,
                             role: msg.role
                         });
-                    }
+                    });
                 });
             }
         });
